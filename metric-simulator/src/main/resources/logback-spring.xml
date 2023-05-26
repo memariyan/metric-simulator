@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <property name="LOG_PATH" value="/tmp/log"/>
+    <springProfile name="staging,prod,dev">
+        <property name="LOG_PATH" value="/var/log"/>
+    </springProfile>
+
+    <springProperty scope="context" name="springAppName" source="spring.application.name"/>
+
+    <springProfile name="local,container">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <springProfile name="local">
+                    <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+                </springProfile>
+                <springProfile name="container">
+                    <pattern>${FILE_LOG_PATTERN}</pattern>
+                </springProfile>
+                <charset>utf8</charset>
+            </encoder>
+        </appender>
+
+        <logger name="com.memariyan" level="info"
+                additivity="false">
+            <appender-ref ref="STDOUT"/>
+        </logger>
+
+        <root level="error">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!container &amp; (dev | staging | prod)">
+        <appender name="SAVE-TO-FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/${springAppName}.log</file>
+            <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                <pattern>${FILE_LOG_PATTERN}</pattern>
+                <charset>utf8</charset>
+            </encoder>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/archived/${springAppName}/log_%d{dd-MM-yyyy}_%i.gz</fileNamePattern>
+                <maxFileSize>500MB</maxFileSize>
+                <maxHistory>10000</maxHistory>
+                <totalSizeCap>500GB</totalSizeCap>
+            </rollingPolicy>
+        </appender>
+
+        <logger name="com.memariyan" level="info"
+                additivity="false">
+            <appender-ref ref="SAVE-TO-FILE"/>
+        </logger>
+
+        <root level="error">
+            <appender-ref ref="SAVE-TO-FILE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="temp">
+        <appender name="LOGSTASH" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/${springAppName}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/archived/${springAppName}/log_%d{dd-MM-yyyy}_%i.gz</fileNamePattern>
+                <maxFileSize>500MB</maxFileSize>
+                <maxHistory>10000</maxHistory>
+                <totalSizeCap>500GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <timeZone>Asia/Tehran</timeZone>
+                    </timestamp>
+                    <pattern>
+                        <pattern>
+                            {
+                            "severity": "%level",
+                            "service": "${springAppName:-}",
+                            "trace": "%X{X-B3-TraceId:-}",
+                            "span": "%X{X-B3-SpanId:-}",
+                            "parent": "%X{X-B3-ParentSpanId:-}",
+                            "pid": "${PID:-}",
+                            "thread": "%thread",
+                            "class": "%logger{40}",
+                            "rest": "%message"
+                            }
+                        </pattern>
+                    </pattern>
+                    <stackTrace>
+                        <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                            <maxDepthPerThrowable>"full"</maxDepthPerThrowable>
+                            <maxLength>"full"</maxLength>
+                            <shortenedClassNameLength>"full"</shortenedClassNameLength>
+                            <rootCauseFirst>true</rootCauseFirst>
+                            <inlineHash>true</inlineHash>
+                        </throwableConverter>
+                    </stackTrace>
+                </providers>
+            </encoder>
+        </appender>
+
+        <logger name="com.memariyan" level="info"
+                additivity="false">
+            <appender-ref ref="LOGSTASH"/>
+        </logger>
+
+        <root level="error">
+            <appender-ref ref="LOGSTASH"/>
+        </root>
+    </springProfile>
+</configuration>
